@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour {
 	public BoardManager boardScript;
 	public float turnDelay = 0.1f;
 	public int playerFoodPoints = 100;
+	public int levelDamage = 1;
 
 	[HideInInspector] public bool playersTurn = true;
 
@@ -42,6 +43,7 @@ public class GameManager : MonoBehaviour {
 	void InitGame(){
 
 		doingSetup = true;
+		levelDamage = level;
 		levelImage = GameObject.Find("LevelImage");
 		levelText = GameObject.Find ("LevelText").GetComponent<Text> ();
 		levelText.text = "Day " + level;

@@ -12,8 +12,18 @@ public class Player : MovingObject {
 	public float restartLevelDelay = 1f;
 	public Text foodText;
 
+	public AudioClip moveSound1;
+	public AudioClip moveSound2;
+	public AudioClip eatSound1;
+	public AudioClip eatSound2;
+	public AudioClip drinkSound1;
+	public AudioClip drinkSound2;
+	public AudioClip gameOverSound;
+
 	private Animator animator;
 	private int food;
+
+	private Vector2 touchOrigin = -Vector2.one;
 	// Use this for initialization
 	protected override void Start () {
 		animator = GetComponent<Animator>();
@@ -35,22 +45,49 @@ public class Player : MovingObject {
 		int horizontal = 0;
 		int vertical = 0;
 
+	#if UNITY_STANDALONE || UNITY_WEBPLAYER
+
 		horizontal = (int)Input.GetAxisRaw ("Horizontal");
 		vertical = (int)Input.GetAxisRaw ("Vertical");
 
 		if (horizontal != 0)
 			vertical = 0;
+
+	#else 
+		if (Input.touchCount > 0 ){
+			Touch myTouch = Input.touches[0];
+			if (myTouch.phase == TouchPhase.Began){
+				touchOrigin = myTouch.position;
+			}
+			else if (myTouch.phase == TouchPhase.Ended && touchOrigin.x == 0){
+				Vector2 touchEnd = myTouch.position;
+				float x = touchEnd.x - touchOrigin.x;
+				float y = touchEnd.y - touchOrigin.y;
+				touchOrigin.x = -1;	
+				if (Mathf.Abs(x) > Mathf.Abs(y)){
+					horizontal = x  > 0 ? 1 : -1;
+				}
+				else
+					vertical = y > 0 ? 1 : -1;
+			}
+		}
+	
+		#endif
+
 		if (horizontal != 0 || vertical != 0)
 			AttemptMove<Wall> (horizontal, vertical);
 	}
 
 	protected override void AttemptMove <T> (int xDir, int yDir){
-		food--;
+		food -= GameManager.instance.levelDamage;
 		foodText.text = "Food: " + food;
 
 		base.AttemptMove <T> (xDir, yDir);
 
 		RaycastHit2D hit;
+
+		if (Move (xDir, yDir, out hit)) 
+			SoundManager.instance.RandomizeSfx (moveSound1, moveSound2);
 
 		CheckIfGameOver ();
 
@@ -64,10 +101,12 @@ public class Player : MovingObject {
 		} else if (other.tag == "Food") {
 			food += pointsPerFood;
 			foodText.text = "+" + pointsPerFood + " Food: " + food;
+			SoundManager.instance.RandomizeSfx (eatSound1, eatSound2);
 			other.gameObject.SetActive (false);
 		} else if (other.tag == "Soda") {
 			food += pointsPerSoda;
 			foodText.text = "+" + pointsPerSoda + " Food: " + food;
+			SoundManager.instance.RandomizeSfx (drinkSound1, drinkSound2);
 			other.gameObject.SetActive (false);
 		}
 	}
@@ -82,15 +121,29 @@ public class Player : MovingObject {
 		Application.LoadLevel (Application.loadedLevel);
 	}
 
-	public void LoseFood (int loss){
+	//LoseFood is called when an enemy attacks the player.
+	//It takes a parameter loss which specifies how many points to lose.
+	public void LoseFood (int loss)
+	{
+		//Set the trigger for the player animator to transition to the playerHit animation.
 		animator.SetTrigger ("playerHit");
+
+		//Subtract lost food points from the players total.
 		food -= loss;
-		foodText.text = "-" + loss + "Food: " + food;
+
+		//Update the food display with the new total.
+		foodText.text = "-"+ loss + " Food: " + food;
+
+		//Check to see if game has ended.
 		CheckIfGameOver ();
 	}
 
+
 	private void CheckIfGameOver(){
-		if (food <= 0)
+		if (food <= 0) {
+			SoundManager.instance.PlaySingle (gameOverSound);
+			SoundManager.instance.musicSource.Stop ();
 			GameManager.instance.GameOver ();
+		}
 	}
 }
